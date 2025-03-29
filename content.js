@@ -23,6 +23,12 @@ function getRelevanceScore(text, keywords) {
     return keywords.some(keyword => 
       text.toLowerCase().includes(keyword.toLowerCase())) ? 1 : 0;
   }
+
+  for(const keyword of keywords){
+    if(text.includes(keyword)){
+        return 1.0
+    }
+  }
   
   // Convert text to embedding vector
   const textVector = getTextEmbedding(text);
@@ -166,7 +172,7 @@ function addOverlayToElements() {
     const relevanceScore = getRelevanceScore(text, keywordsToBlock);
     
     // Only filter content above a certain relevance threshold
-    if (relevanceScore > 0.6) { // Adjust threshold as needed
+    if (relevanceScore > 0.8) { // Adjust threshold as needed
       // Find the closest block-level parent to overlay
       let parent = node.parentElement;
       
@@ -213,7 +219,7 @@ function handleYouTubeFiltering() {
       
       // Use relevance score instead of direct keyword match
       const relevanceScore = getRelevanceScore(titleText, keywordsToBlock);
-      if (relevanceScore > 0.6) { // Same threshold as regular content
+      if (relevanceScore > 0.8) { // Same threshold as regular content
         // Add the entire video element to matches
         matches.add(videoElement);
       }
@@ -243,7 +249,7 @@ function handleYouTubeFiltering() {
       const titleText = titleElement.textContent;
       
       const relevanceScore = getRelevanceScore(titleText, keywordsToBlock);
-      if (relevanceScore > 0.6) {
+      if (relevanceScore > 0.8) {
         matches.add(video);
       }
     }
