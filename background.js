@@ -1,113 +1,129 @@
-// Listen for extension installation
-chrome.runtime.onInstalled.addListener(function() {
+// Initialize when extension is installed
+chrome.runtime.onInstalled.addListener(() => {
   console.log("FocusMode extension installed");
   
-  // Set default settings
-  chrome.storage.sync.set({
-    focusModeEnabled: false,
-    blockedSites: [
-      "facebook.com",
-      "twitter.com",
-      "instagram.com",
-      "youtube.com"
-    ]
-  }, function() {
-    console.log("Default settings saved successfully");
-    // Log what was saved
-    chrome.storage.sync.get(null, function(data) {
-      console.log("Current storage state:", data);
-    });
-  });
+  // Set default state - blocking disabled
+  chrome.storage.sync.set({ isEnabled: false });
 });
 
-// Listen for tab updates
-chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
-  console.log("Tab updated - ID:", tabId, "Status:", changeInfo.status);
-  
-  // Check if URL is blocked when a tab finishes loading
-  if (changeInfo.status === 'complete' && tab.url) {
-    console.log("Tab fully loaded:", tab.url);
+// Listen for messages from popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "toggleBlocking") {
+    const isEnabled = message.isEnabled;
+    console.log("Toggling blocking:", isEnabled);
     
-    chrome.storage.sync.get(['focusModeEnabled', 'blockedSites'], function(data) {
-      console.log("Focus mode enabled:", data.focusModeEnabled);
-      console.log("Blocked sites list:", data.blockedSites);
-      
-      // If focus mode is on, check if we should block this site
-      if (data.focusModeEnabled) {
-        const currentUrl = new URL(tab.url).hostname;
-        console.log("Checking URL:", currentUrl);
-        
-        // Check if current site is in blocked list
-        const isBlocked = data.blockedSites.some(site => {
-          const matches = currentUrl.includes(site);
-          console.log(`Checking against ${site}: ${matches ? "BLOCKED" : "allowed"}`);
-          return matches;
-        });
-        
-        if (isBlocked) {
-          console.log("BLOCKING ACCESS to:", currentUrl);
-          // Redirect to a block page
-          chrome.tabs.update(tabId, { url: "blocked.html" });
-        } else {
-          console.log("Site allowed:", currentUrl);
+    // Save state
+    chrome.storage.sync.set({ isEnabled: isEnabled });
+    
+    // Update blocking rules
+    updateBlockRules(isEnabled);
+    
+    sendResponse({ success: true });
+  }
+  else if (message.action === "getState") {
+    chrome.storage.sync.get(['isEnabled'], (data) => {
+      sendResponse({ isEnabled: data.isEnabled || false });
+    });
+    return true; // Will respond asynchronously
+  }
+});
+
+// Function to enable/disable blocking rules
+function updateBlockRules(isEnabled) {
+  if (isEnabled) {
+    // Add rule to block Facebook
+    chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [1],  // Remove existing rule if any
+      addRules: [
+        {
+          id: 1,
+          priority: 1,
+          action: { type: "block" },
+          condition: { 
+            urlFilter: "facebook.com", 
+            resourceTypes: ["main_frame"] 
+          }
         }
-      } else {
-        console.log("Focus mode is OFF - not checking for blocked sites");
-      }
+      ]
     });
-  }
-});
-
-// Listen for messages from popup.js
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  console.log("Message received:", request);
-  console.log("Sender:", sender);
-  
-  if (request.action === "toggleFocusMode") {
-    console.log("Toggling focus mode to:", request.enabled);
-    
-    chrome.storage.sync.set({ focusModeEnabled: request.enabled }, function() {
-      console.log("Focus mode setting updated successfully");
-      sendResponse({ success: true });
+    console.log("Facebook blocking enabled");
+  } else {
+    // Remove blocking rule
+    chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [1]
     });
-    
-    // Return true to indicate you wish to send a response asynchronously
-    return true;
+    console.log("Facebook blocking disabled");
   }
-});
-
-// Ad blocking functionality
-chrome.webRequest.onBeforeRequest.addListener(
-    function(details) {
-        console.log("Blocked ad request:", details.url);
-        return {cancel: true};
-    },
-    {urls: [
-        "*://*.zedo.com/*",
-        "*://*.doubleclick.net/*",
-        "*://partner.googleadservices.com/*",
-        "*://*.googlesyndication.com/*",
-        "*://*.google-analytics.com/*",
-        "*://creative.ak.fbcdn.net/*",
-        "*://*.adbrite.com/*",
-        "*://*.exponential.com/*",
-        "*://*.quantserve.com/*",
-        "*://*.scorecardresearch.com/*",
-    ]},
-    ["blocking"]
-);
-
-// Log when the extension starts
-console.log("Background script initialized - " + new Date().toLocaleString());
-
-// Add a helper function to dump current state for debugging
-function dumpState() {
-  console.log("=== EXTENSION STATE DUMP ===");
-  chrome.storage.sync.get(null, function(data) {
-    console.log("Storage data:", data);
-  });
-  console.log("========================");
 }
 
-// Run state dump on initialization
-dumpState();
+// When browser restarts, check saved state and apply rules
+chrome.runtime.onStartup.addListener(() => {
+  chrome.storage.sync.get(['isEnabled'], (data) => {
+    updateBlockRules(data.isEnabled || false);
+  });
+});
+
+
+// Add this to your existing background.js
+
+// Default content filtering settings
+let contentFilterSettings = {
+  isEnabled: false,
+  keywords: ['politics', 'election', 'controversy'] // Default keywords
+};
+
+// Initialize settings
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.sync.set({ contentFilterSettings: contentFilterSettings });
+});
+
+// Load settings from storage
+function loadContentFilterSettings() {
+  chrome.storage.sync.get(['contentFilterSettings'], (data) => {
+    if (data.contentFilterSettings) {
+      contentFilterSettings = data.contentFilterSettings;
+    }
+  });
+}
+
+// Listen for content script requests
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Handle existing messages...
+  
+  if (message.action === 'getContentFilters') {
+    sendResponse({
+      isEnabled: contentFilterSettings.isEnabled,
+      keywords: contentFilterSettings.keywords
+    });
+  }
+  else if (message.action === 'updateContentFilters') {
+    contentFilterSettings = {
+      isEnabled: message.isEnabled,
+      keywords: message.keywords
+    };
+    
+    chrome.storage.sync.set({ contentFilterSettings: contentFilterSettings });
+    
+    // Send update to all tabs
+    chrome.tabs.query({}, (tabs) => {
+      for (let tab of tabs) {
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'updateFilters',
+          isEnabled: contentFilterSettings.isEnabled,
+          keywords: contentFilterSettings.keywords
+        }).catch(() => {
+          // Ignore errors for tabs where content script isn't loaded
+        });
+      }
+    });
+    
+    sendResponse({ success: true });
+  }
+  
+  // Return true for async response
+  return true;
+});
+
+// Load settings on startup
+chrome.runtime.onStartup.addListener(loadContentFilterSettings);
+loadContentFilterSettings();
