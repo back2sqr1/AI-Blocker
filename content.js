@@ -8,6 +8,12 @@ function addOverlayToElements() {
   
   console.log("Filtering content for keywords:", keywordsToBlock);
   
+  // Special handling for YouTube
+  if (window.location.hostname.includes("youtube.com")) {
+    handleYouTubeFiltering();
+    return;
+  }
+  
   // Get all text nodes in the document
   const walker = document.createTreeWalker(
     document.body,
@@ -56,16 +62,97 @@ function addOverlayToElements() {
   }
   
   // Add overlays to matched elements
-  matches.forEach(element => {
+  applyOverlaysToElements(matches);
+}
+
+// Special handling for YouTube videos
+function handleYouTubeFiltering() {
+  // For YouTube home page and search results
+  const videoElements = document.querySelectorAll('ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, ytd-rich-item-renderer');
+  const matches = new Set();
+  
+  videoElements.forEach(videoElement => {
+    // Find the title element
+    let titleElement;
+    
+    // Different types of video elements have different title structures
+    if (videoElement.querySelector('#video-title, .title')) {
+      titleElement = videoElement.querySelector('#video-title, .title');
+    }
+    
+    if (titleElement) {
+      const titleText = titleElement.textContent.toLowerCase();
+      
+      // Check if title contains any blocked keywords
+      for (const keyword of keywordsToBlock) {
+        if (titleText.includes(keyword.toLowerCase())) {
+          // Add the entire video element to matches
+          matches.add(videoElement);
+          break;
+        }
+      }
+    }
+  });
+  
+  // For YouTube watch page - video title
+  const watchPageTitle = document.querySelector('.title.ytd-video-primary-info-renderer');
+  if (watchPageTitle) {
+    const titleText = watchPageTitle.textContent.toLowerCase();
+    
+    for (const keyword of keywordsToBlock) {
+      if (titleText.includes(keyword.toLowerCase())) {
+        // Find the player container
+        const playerContainer = document.querySelector('.html5-video-player');
+        if (playerContainer) {
+          matches.add(playerContainer);
+        }
+        break;
+      }
+    }
+  }
+  
+  // For recommended videos sidebar
+  const recommendedVideos = document.querySelectorAll('ytd-compact-video-renderer');
+  recommendedVideos.forEach(video => {
+    const titleElement = video.querySelector('#video-title');
+    if (titleElement) {
+      const titleText = titleElement.textContent.toLowerCase();
+      
+      for (const keyword of keywordsToBlock) {
+        if (titleText.includes(keyword.toLowerCase())) {
+          matches.add(video);
+          break;
+        }
+      }
+    }
+  });
+  
+  applyOverlaysToElements(matches);
+}
+
+// Function to apply overlays to a set of elements
+function applyOverlaysToElements(elements) {
+  elements.forEach(element => {
     // Skip if already has overlay
     if (element.classList.contains('content-filtered') || 
         element.querySelector('.content-blocker-overlay')) {
       return;
     }
     
-
+    // Store original dimensions to prevent collapse
+    const originalHeight = element.offsetHeight;
+    const originalWidth = element.offsetWidth;
+    
     element.classList.add('content-filtered');
     element.style.position = 'relative';
+    
+    // Ensure the element maintains its size when blurred
+    if (originalHeight > 0) {
+      element.style.minHeight = originalHeight + 'px';
+    }
+    if (originalWidth > 0) {
+      element.style.minWidth = originalWidth + 'px';
+    }
 
     // Create overlay
     const overlay = document.createElement('div');
@@ -84,9 +171,9 @@ function addOverlayToElements() {
 
     // Add functionality to close icon
     closeIcon.addEventListener('click', function(e) {
-    e.stopPropagation();
-    overlay.style.display = 'none';
-    element.classList.remove('content-filtered');
+      e.stopPropagation();
+      overlay.style.display = 'none';
+      element.classList.remove('content-filtered');
     });
   });
 }
@@ -130,7 +217,11 @@ chrome.runtime.sendMessage({action: 'getContentFilters'}, response => {
 // Set up a MutationObserver to handle dynamically loaded content
 const observer = new MutationObserver((mutations) => {
   if (isFilteringEnabled && keywordsToBlock.length > 0) {
-    addOverlayToElements();
+    // Use a debounce to avoid excessive processing
+    clearTimeout(window.filterDebounce);
+    window.filterDebounce = setTimeout(() => {
+      addOverlayToElements();
+    }, 500);
   }
 });
 
