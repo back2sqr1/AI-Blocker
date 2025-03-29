@@ -43,8 +43,6 @@ document.querySelectorAll('.block-item input[type="checkbox"]').forEach((checkbo
     }
 });
 
-// Update timer display
-updateTimerDisplay(settings);
 });
 
 // Toggle focus mode on/off
@@ -82,45 +80,6 @@ checkbox.addEventListener('change', function() {
     });
 });
 });
-});
-
-// Timer functionality
-let timerInterval;
-let seconds = 25 * 60; // 25 minutes in seconds
-
-document.querySelector('.primary-button').addEventListener('click', function() {
-  // Start button clicked
-  if (this.textContent === 'Start') {
-    this.textContent = 'Pause';
-    
-    timerInterval = setInterval(function() {
-      seconds--;
-      
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      
-      document.querySelector('.timer span').textContent = 
-        `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds} Remaining`;
-        
-      if (seconds <= 0) {
-        clearInterval(timerInterval);
-        document.querySelector('.primary-button').textContent = 'Start';
-        alert('Focus session completed!');
-      }
-    }, 1000);
-  } else {
-    // Pause button clicked
-    this.textContent = 'Start';
-    clearInterval(timerInterval);
-  }
-});
-
-// Reset button
-document.querySelector('.secondary-button').addEventListener('click', function() {
-  clearInterval(timerInterval);
-  seconds = 25 * 60;
-  document.querySelector('.timer span').textContent = '25:00 Remaining';
-  document.querySelector('.primary-button').textContent = 'Start';
 });
 
 
