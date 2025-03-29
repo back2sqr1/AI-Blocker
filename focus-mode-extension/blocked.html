@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Site Blocked - FocusMode</title>
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --background: #ffffff;
+      --text: #1f2937;
+      --text-secondary: #6b7280;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-color: var(--background);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .container {
+      max-width: 500px;
+    }
+    
+    h1 {
+      color: var(--primary);
+      margin-bottom: 10px;
+    }
+    
+    p {
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    
+    .button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background-color 0.2s;
+    }
+    
+    .button:hover {
+      background-color: var(--primary-hover);
+    }
+    
+    .site-info {
+      font-weight: bold;
+      color: var(--primary);
+    }
+    
+    .timer {
+      margin: 20px 0;
+      font-size: 18px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Site Blocked</h1>
+    <p>You're trying to access <span id="blockedSite" class="site-info"></span>, which is currently blocked by FocusMode.</p>
+    <p>Stay focused on what matters! Your future self will thank you.</p>
+    
+    <div class="timer" id="timerDisplay"></div>
+    
+    <button class="button" id="continueAnyway">Continue Anyway (5s)</button>
+    <p><small>Or <a href="#" id="goBack">go back</a> to where you were.</small></p>
+  </div>
+  
+  <script>
+    // Get URL parameters
+    const params = new URLSearchParams(window.location.search);
+    const blockedSite = params.get('site');
+    const fromUrl = params.get('from');
+    
+    // Display blocked site
+    document.getElementById('blockedSite').textContent = blockedSite;
+    
+    // Setup back button
+    document.getElementById('goBack').addEventListener('click', (e) => {
+      e.preventDefault();
+      history.back();
+    });
+    
+    // Setup continue anyway button with countdown
+    const continueButton = document.getElementById('continueAnyway');
+    let countdown = 5;
+    
+    const intervalId = setInterval(() => {
+      countdown--;
+      continueButton.textContent = `Continue Anyway (${countdown}s)`;
+      
+      if (countdown <= 0) {
+        clearInterval(intervalId);
+        continueButton.textContent = 'Continue Anyway';
+        
+        // Enable button
+        continueButton.addEventListener('click', () => {
+          // Record this as a bypass
+          chrome.runtime.sendMessage({ action: 'recordBypass', site: blockedSite });
+          
+          // Navigate to the blocked site
+          window.location.href = fromUrl;
+        });
+      }
+    }, 1000);
+    
+    // Get timer info
+    chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+      const settings = response.settings;
+      const timerDisplay = document.getElementById('timerDisplay');
+      
+      if (settings.focusTimer.isActive) {
+        const minutes = Math.floor(settings.focusTimer.remaining / 60);
+        const seconds = settings.focusTimer.remaining % 60;
+        timerDisplay.textContent = `Focus session: ${minutes}m ${seconds}s remaining`;
+      } else {
+        timerDisplay.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>

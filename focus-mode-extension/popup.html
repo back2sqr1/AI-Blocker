@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusMode</title>
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --background: #ffffff;
+      --surface: #f3f4f6;
+      --text: #1f2937;
+      --text-secondary: #6b7280;
+      --border: #e5e7eb;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--background);
+      color: var(--text);
+      width: 360px;
+      height: 500px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .logo-icon {
+      width: 24px;
+      height: 24px;
+      color: var(--primary);
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 24px;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--border);
+      transition: .4s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--success);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+
+    .toggle-text {
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+
+    .tab.active {
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .tab:hover:not(.active) {
+      background-color: var(--surface);
+    }
+
+    .content {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .block-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .block-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background-color: var(--surface);
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .block-item:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+    .block-item-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .category-icon {
+      width: 24px;
+      height: 24px;
+      color: var(--primary);
+    }
+
+    .category-text {
+      font-weight: 500;
+    }
+
+    .category-description {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .add-block {
+      margin-top: 16px;
+      padding: 12px;
+      background-color: var(--surface);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .add-block:hover {
+      background-color: var(--border);
+    }
+
+    .add-icon {
+      width: 20px;
+      height: 20px;
+      color: var(--text-secondary);
+    }
+
+    .stats-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .stat-card {
+      flex: 1;
+      min-width: 140px;
+      padding: 16px;
+      background-color: var(--surface);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .chart-container {
+      margin-top: 16px;
+      height: 160px;
+      background-color: var(--surface);
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: var(--text-secondary);
+    }
+
+    .settings-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .settings-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background-color: var(--surface);
+      border-radius: 8px;
+    }
+
+    .settings-item-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .settings-title {
+      font-weight: 500;
+    }
+
+    .settings-description {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .timer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    .timer-icon {
+      width: 16px;
+      height: 16px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-button {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: none;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+
+    .primary-button {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .primary-button:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .secondary-button {
+      background-color: var(--surface);
+      color: var(--text);
+    }
+
+    .secondary-button:hover {
+      background-color: var(--border);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+      </svg>
+      <span>FocusMode</span>
+    </div>
+    <div class="toggle-container">
+      <span class="toggle-text">Off</span>
+      <label class="toggle">
+        <input type="checkbox" id="focusToggle">
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-text">On</span>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="blockTab">Block List</div>
+    <div class="tab" id="statsTab">Stats</div>
+    <div class="tab" id="settingsTab">Settings</div>
+  </div>
+
+  <div class="content" id="blockContent">
+    <div class="block-list">
+      <div class="block-item">
+        <div class="block-item-left">
+          <svg class="category-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <div>
+            <div class="category-text">News Sites</div>
+            <div class="category-description">Major news platforms and feeds</div>
+          </div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="block-item">
+        <div class="block-item-left">
+          <svg class="category-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <div>
+            <div class="category-text">Video Games</div>
+            <div class="category-description">Gaming sites and platforms</div>
+          </div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="block-item">
+        <div class="block-item-left">
+          <svg class="category-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+          </svg>
+          <div>
+            <div class="category-text">Social Media</div>
+            <div class="category-description">Facebook, Twitter, Instagram, etc.</div>
+          </div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="block-item">
+        <div class="block-item-left">
+          <svg class="category-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <div>
+            <div class="category-text">Shopping</div>
+            <div class="category-description">E-commerce and online stores</div>
+          </div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="add-block">
+        <svg class="add-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Add Custom Block</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="content" id="statsContent" style="display: none;">
+    <div class="stats-container">
+      <div class="stat-card">
+        <div class="stat-value">24</div>
+        <div class="stat-label">Sites Blocked Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">3.2h</div>
+        <div class="stat-label">Focus Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">68%</div>
+        <div class="stat-label">Productivity</div>
+      </div>
+    </div>
+    <div class="chart-container">
+      Weekly Focus Trend Chart
+    </div>
+  </div>
+
+  <div class="content" id="settingsContent" style="display: none;">
+    <div class="settings-list">
+      <div class="settings-item">
+        <div class="settings-item-left">
+          <div class="settings-title">Focus Timer</div>
+          <div class="settings-description">Set timer for focused work sessions</div>
+        </div>
+        <button class="action-button secondary-button">Configure</button>
+      </div>
+      <div class="settings-item">
+        <div class="settings-item-left">
+          <div class="settings-title">Scheduled Focus</div>
+          <div class="settings-description">Automatically activate at set times</div>
+        </div>
+        <button class="action-button secondary-button">Configure</button>
+      </div>
+      <div class="settings-item">
+        <div class="settings-item-left">
+          <div class="settings-title">Whitelist</div>
+          <div class="settings-description">Allow specific sites during focus mode</div>
+        </div>
+        <button class="action-button secondary-button">Configure</button>
+      </div>
+      <div class="settings-item">
+        <div class="settings-item-left">
+          <div class="settings-title">Block Strength</div>
+          <div class="settings-description">Choose how strictly to enforce blocks</div>
+        </div>
+        <button class="action-button secondary-button">Configure</button>
+      </div>
+      <div class="settings-item">
+        <div class="settings-item-left">
+          <div class="settings-title">Data & Privacy</div>
+          <div class="settings-description">Manage your usage data</div>
+        </div>
+        <button class="action-button secondary-button">Configure</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="timer">
+      <svg class="timer-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      <span>25:00 Remaining</span>
+    </div>
+    <div class="actions">
+      <button class="action-button secondary-button">Reset</button>
+      <button class="action-button primary-button">Start</button>
+    </div>
+  </div>
+
+  <script>
+    // Simple tab switching functionality
+    document.getElementById('blockTab').addEventListener('click', () => {
+      document.getElementById('blockTab').classList.add('active');
+      document.getElementById('statsTab').classList.remove('active');
+      document.getElementById('settingsTab').classList.remove('active');
+      document.getElementById('blockContent').style.display = 'block';
+      document.getElementById('statsContent').style.display = 'none';
+      document.getElementById('settingsContent').style.display = 'none';
+    });
+
+    document.getElementById('statsTab').addEventListener('click', () => {
+      document.getElementById('blockTab').classList.remove('active');
+      document.getElementById('statsTab').classList.add('active');
+      document.getElementById('settingsTab').classList.remove('active');
+      document.getElementById('blockContent').style.display = 'none';
+      document.getElementById('statsContent').style.display = 'block';
+      document.getElementById('settingsContent').style.display = 'none';
+    });
+
+    document.getElementById('settingsTab').addEventListener('click', () => {
+      document.getElementById('blockTab').classList.remove('active');
+      document.getElementById('statsTab').classList.remove('active');
+      document.getElementById('settingsTab').classList.add('active');
+      document.getElementById('blockContent').style.display = 'none';
+      document.getElementById('statsContent').style.display = 'none';
+      document.getElementById('settingsContent').style.display = 'block';
+    });
+
+    // Additional JavaScript to connect with background script
+document.addEventListener('DOMContentLoaded', function() {
+  // Get settings from background script
+  chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+    const settings = response.settings;
+    
+    // Update UI based on settings
+    document.getElementById('focusToggle').checked = settings.isEnabled;
+    
+    // Update category toggles
+    document.querySelectorAll('.block-item input[type="checkbox"]').forEach((checkbox, index) => {
+      const categories = ['news', 'videoGames', 'socialMedia', 'shopping'];
+      if (index < categories.length) {
+        checkbox.checked = settings.categories[categories[index]];
+      }
+    });
+    
+    // Update timer display
+    updateTimerDisplay(settings);
+  });
+  
+  // Toggle focus mode on/off
+  document.getElementById('focusToggle').addEventListener('change', function() {
+    chrome.runtime.sendMessage({ 
+      action: 'getSettings' 
+    }, (response) => {
+      const settings = response.settings;
+      settings.isEnabled = this.checked;
+      
+      chrome.runtime.sendMessage({ 
+        action: 'updateSettings', 
+        settings: settings 
+      });
+    });
+  });
+  
+  // Toggle categories
+  document.querySelectorAll('.block-item input[type="checkbox"]').forEach((checkbox, index) => {
+    checkbox.addEventListener('change', function() {
+      chrome.runtime.sendMessage({ 
+        action: 'getSettings' 
+      }, (response) => {
+        const settings = response.settings;
+        const categories = ['news', 'videoGames', 'socialMedia', 'shopping'];
+        
+        if (index < categories.length) {
+          settings.categories[categories[index]] = this.checked;
+          
+          chrome.runtime.sendMessage({ 
+            action: 'updateSettings', 
+            settings: settings 
+          });
+        }
+      });
+    });
+  });
+  
+  // Timer controls
+  document.querySelector('.primary-button').addEventListener('click', function() {
+    if (this.textContent === 'Start') {
+      // Start timer
+      chrome.runtime.sendMessage({ 
+        action: 'startTimer',
+        duration: 25 * 60 // 25 minutes
+      }, () => {
+        this.textContent = 'Pause';
+        
+        // Refresh the UI
+        chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+          updateTimerDisplay(response.settings);
+        });
+      });
+    } else {
+      // Pause timer
+      chrome.runtime.sendMessage({ 
+        action: 'stopTimer' 
+      }, () => {
+        this.textContent = 'Start';
+        
+        // Refresh the UI
+        chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+          updateTimerDisplay(response.settings);
+        });
+      });
+    }
+  });
+  
+  // Reset timer
+  document.querySelector('.secondary-button').addEventListener('click', function() {
+    chrome.runtime.sendMessage({ 
+      action: 'stopTimer' 
+    }, () => {
+      document.querySelector('.primary-button').textContent = 'Start';
+      
+      // Refresh the UI
+      chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+        updateTimerDisplay(response.settings);
+      });
+    });
+  });
+  
+  // Update timer display
+  function updateTimerDisplay(settings) {
+    const timerDisplay = document.querySelector('.timer span');
+    
+    if (settings.focusTimer.isActive) {
+      const minutes = Math.floor(settings.focusTimer.remaining / 60);
+      const seconds = settings.focusTimer.remaining % 60;
+      timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')} Remaining`;
+      document.querySelector('.primary-button').textContent = 'Pause';
+    } else {
+      timerDisplay.textContent = '25:00 Remaining';
+      document.querySelector('.primary-button').textContent = 'Start';
+    }
+  }
+  
+  // Periodically update timer display
+  setInterval(() => {
+    chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+      if (response.settings.focusTimer.isActive) {
+        updateTimerDisplay(response.settings);
+      }
+    });
+  }, 1000);
+});
+  </script>
+</body>
+</html>
