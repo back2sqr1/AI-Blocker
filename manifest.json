@@ -1,0 +1,26 @@
+{
+    "name" : "AI Blocker",
+    "version" : "1.0.0",
+    "manifest_version" : 3,
+    "permissions": [
+        "declarativeNetRequest",
+        "webRequest",
+        "webRequestBlocking",
+        "<all_urls>"
+    ],
+    "background": {
+        "scripts": ["background.js"]
+    },
+    "icons": {
+        "48": "images/icon-48.png"
+    },
+    "declarative_net_request": {
+        "rule_resources": [
+            {
+                "id": "ruleset_1",
+                "enabled": true,
+                "path": "rules.json"
+            }
+        ]
+    }
+}
