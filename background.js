@@ -2,12 +2,33 @@
 chrome.runtime.onInstalled.addListener(() => {
   console.log("FocusMode extension installed");
   
+  // Define website categories with their URLs
+  const defaultCategories = {
+    news: {
+      enabled: true,
+      sites: ["cnn.com", "nytimes.com", "foxnews.com", "bbc.com", "reuters.com"]
+    },
+    videoGames: {
+      enabled: true,
+      sites: ["twitch.tv", "ign.com", "gamespot.com", "polygon.com", "steam.com"] 
+    },
+    socialMedia: {
+      enabled: true,
+      sites: ["facebook.com", "twitter.com", "instagram.com", "tiktok.com", "reddit.com"]
+    },
+    shopping: {
+      enabled: false,
+      sites: ["amazon.com", "ebay.com", "walmart.com", "etsy.com", "target.com"]
+    }
+  };
+  
   // Set default state - blocking disabled
   chrome.storage.sync.set({ 
     isEnabled: false,
+    categories: defaultCategories,
     contentFilterSettings: {
       isEnabled: false,
-      keywords: ['politics', 'election', 'controversy'] // Default keywords
+      keywords: ['politics', 'election', 'controversy']
     }
   });
 });
@@ -15,20 +36,28 @@ chrome.runtime.onInstalled.addListener(() => {
 // Default content filtering settings
 let contentFilterSettings = {
   isEnabled: false,
-  keywords: ['politics', 'election', 'controversy'] // Default keywords
+  keywords: ['politics', 'election', 'controversy']
 };
 
+// Current category settings
+let categories = {};
+
 // Load settings from storage
-function loadContentFilterSettings() {
-  chrome.storage.sync.get(['contentFilterSettings'], (data) => {
+function loadSettings() {
+  chrome.storage.sync.get(['contentFilterSettings', 'categories'], (data) => {
     if (data.contentFilterSettings) {
       contentFilterSettings = data.contentFilterSettings;
+    }
+    if (data.categories) {
+      categories = data.categories;
     }
   });
 }
 
 // SINGLE combined listener for all messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("Received message:", message);
+  
   // Website blocking messages
   if (message.action === "toggleBlocking") {
     const isEnabled = message.isEnabled;
@@ -50,8 +79,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   }
   else if (message.action === "getState") {
-    chrome.storage.sync.get(['isEnabled'], (data) => {
-      sendResponse({ isEnabled: data.isEnabled || false });
+    chrome.storage.sync.get(['isEnabled', 'categories'], (data) => {
+      sendResponse({ 
+        isEnabled: data.isEnabled || false,
+        categories: data.categories || {}
+      });
+    });
+    return true; // Will respond asynchronously
+  }
+  // Category management
+  else if (message.action === "toggleCategory") {
+    chrome.storage.sync.get(['categories', 'isEnabled'], (data) => {
+      const categories = data.categories || {};
+      const isEnabled = data.isEnabled || false;
+      
+      if (categories[message.category]) {
+        categories[message.category].enabled = message.enabled;
+        
+        chrome.storage.sync.set({ categories: categories }, () => {
+          // Only update block rules if main toggle is on
+          if (isEnabled) {
+            updateBlockRules(true);
+          }
+          sendResponse({ success: true });
+        });
+      }
     });
     return true; // Will respond asynchronously
   }
@@ -82,29 +134,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Function to enable/disable blocking rules
 function updateBlockRules(isEnabled) {
+  // Start by removing any existing rules
+  chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: Array.from({ length: 100 }, (_, i) => i + 1) // Remove rules 1-100
+  });
+  
   if (isEnabled) {
-    // Add rule to block Facebook
-    chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [1],  // Remove existing rule if any
-      addRules: [
-        {
-          id: 1,
-          priority: 1,
-          action: { type: "block" },
-          condition: { 
-            urlFilter: "facebook.com", 
-            resourceTypes: ["main_frame"] 
-          }
+    chrome.storage.sync.get(['categories'], (data) => {
+      const categories = data.categories || {};
+      const rulesToAdd = [];
+      let ruleId = 1;
+      
+      // Add rules for each enabled category
+      for (const category in categories) {
+        if (categories[category].enabled) {
+          categories[category].sites.forEach(site => {
+            rulesToAdd.push({
+              id: ruleId++,
+              priority: 1,
+              action: { type: "block" },
+              condition: { 
+                urlFilter: site, 
+                resourceTypes: ["main_frame"] 
+              }
+            });
+          });
         }
-      ]
+      }
+      
+      // Add the rules if there are any
+      if (rulesToAdd.length > 0) {
+        chrome.declarativeNetRequest.updateDynamicRules({
+          addRules: rulesToAdd
+        });
+        console.log("Added blocking rules:", rulesToAdd);
+      }
     });
-    console.log("Facebook blocking enabled");
-  } else {
-    // Remove blocking rule
-    chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [1]
-    });
-    console.log("Facebook blocking disabled");
   }
 }
 
@@ -128,8 +193,8 @@ chrome.runtime.onStartup.addListener(() => {
   chrome.storage.sync.get(['isEnabled'], (data) => {
     updateBlockRules(data.isEnabled || false);
   });
+  loadSettings();
 });
 
-// Load settings on startup
-chrome.runtime.onStartup.addListener(loadContentFilterSettings);
-loadContentFilterSettings();
+// Load settings right away
+loadSettings();

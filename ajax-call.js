@@ -192,3 +192,49 @@ function updateKeywordsList(keywords) {
     });
   });
 }
+
+// In your DOMContentLoaded event handler, add this:
+
+// Get all category toggle checkboxes
+const categoryToggles = document.querySelectorAll('.block-item input[type="checkbox"]');
+
+// Get current state from background script
+chrome.runtime.sendMessage({ action: 'getState' }, (response) => {
+  if (!response || chrome.runtime.lastError) {
+    console.warn("Error getting state:", chrome.runtime.lastError);
+    return;
+  }
+  
+  // Update main toggle
+  document.getElementById('focusToggle').checked = response.isEnabled;
+  
+  // Update category toggles
+  const categories = response.categories;
+  const categoryNames = ['news', 'videoGames', 'socialMedia', 'shopping'];
+  
+  categoryToggles.forEach((toggle, index) => {
+    if (index < categoryNames.length) {
+      const category = categoryNames[index];
+      if (categories[category]) {
+        toggle.checked = categories[category].enabled;
+      }
+    }
+  });
+});
+
+// Add event listeners to category toggles
+categoryToggles.forEach((toggle, index) => {
+  toggle.addEventListener('change', function() {
+    const categoryNames = ['news', 'videoGames', 'socialMedia', 'shopping'];
+    if (index < categoryNames.length) {
+      const category = categoryNames[index];
+      const enabled = this.checked;
+      
+      chrome.runtime.sendMessage({ 
+        action: 'toggleCategory', 
+        category: category,
+        enabled: enabled
+      });
+    }
+  });
+});
