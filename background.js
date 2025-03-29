@@ -2,6 +2,7 @@
 chrome.runtime.onInstalled.addListener(function() {
   console.log("FocusMode extension installed");
   
+<<<<<<< HEAD
   // Set default settings
   chrome.storage.sync.set({
     focusModeEnabled: false,
@@ -81,12 +82,41 @@ chrome.webRequest.onBeforeRequest.addListener(
     function(details) {
         console.log("Blocked ad request:", details.url);
         return {cancel: true};
+=======
+  // Default settings
+let settings = {
+  isEnabled: false,
+  categories: {
+    news: true,
+    videoGames: true,
+    socialMedia: true,
+    shopping: false
+  },
+  customBlocks: [],
+  stats: {
+    sitesBlockedToday: 0,
+    focusTimeToday: 0
+  }
+};
+
+chrome.webRequest.onBeforeRequest.addListener(
+    function(details) {
+        if (isEnabled)
+          return {cancel: true}
+        else  
+          return {cancel: false}
+>>>>>>> c6fd55b679bf762f6852e840ee1c88a4fcc79c87
     },
     {urls: [
         "*://*.zedo.com/*",
         "*://*.doubleclick.net/*",
+<<<<<<< HEAD
         "*://partner.googleadservices.com/*",
         "*://*.googlesyndication.com/*",
+=======
+        "*://*partner.googleadservices.com/*",
+        "://*.googlesyndication.com/*",
+>>>>>>> c6fd55b679bf762f6852e840ee1c88a4fcc79c87
         "*://*.google-analytics.com/*",
         "*://creative.ak.fbcdn.net/*",
         "*://*.adbrite.com/*",

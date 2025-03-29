@@ -9,12 +9,6 @@
         "webRequest",
         "webRequestBlocking"
     ],
-    "content_scripts": [
-      {
-        "matches": ["<all_urls>"],
-        "js": ["content.js"]
-      }
-    ],  
     "action": {
       "default_popup": "popup.html"
     },
