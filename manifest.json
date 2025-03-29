@@ -25,6 +25,12 @@
     "icons": {
         "48": "images/icons-48.png"
     },
+    "web_accessible_resources": [
+    {
+        "resources": ["embeddings-mini.json"],
+        "matches": ["<all_urls>"]
+    }
+    ],
     "declarative_net_request": {
         "rule_resources": [
             {

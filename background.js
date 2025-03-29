@@ -1,3 +1,6 @@
+
+
+
 // Initialize when extension is installed
 chrome.runtime.onInstalled.addListener(() => {
   console.log("FocusMode extension installed");

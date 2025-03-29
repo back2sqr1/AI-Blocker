@@ -1,6 +1,133 @@
+// Global variable to store embeddings
+let wordEmbeddings = null;
+
+// Load embeddings when content script initializes
+fetch(chrome.runtime.getURL('embeddings-mini.json'))
+  .then(response => response.json())
+  .then(data => {
+    wordEmbeddings = data;
+    console.log('Word embeddings loaded successfully');
+  })
+  .catch(error => {
+    console.error('Failed to load word embeddings:', error);
+  });
+
 // Keywords to filter (these would be configurable in your extension)
 let keywordsToBlock = [];
 let isFilteringEnabled = false;
+
+// Calculate text similarity using embeddings
+function getRelevanceScore(text, keywords) {
+  // Fallback to simple keyword matching if embeddings aren't loaded
+  if (!wordEmbeddings) {
+    return keywords.some(keyword => 
+      text.toLowerCase().includes(keyword.toLowerCase())) ? 1 : 0;
+  }
+  
+  // Convert text to embedding vector
+  const textVector = getTextEmbedding(text);
+  if (!textVector) {
+    // Fallback if we can't get an embedding for the text
+    return keywords.some(keyword => 
+      text.toLowerCase().includes(keyword.toLowerCase())) ? 1 : 0;
+  }
+  
+  // Find highest similarity with any keyword
+  let maxSimilarity = 0;
+  for (const keyword of keywords) {
+    const keywordVector = getKeywordEmbedding(keyword);
+    if (keywordVector) {
+      const similarity = cosineSimilarity(textVector, keywordVector);
+      maxSimilarity = Math.max(maxSimilarity, similarity);
+    } else if (text.toLowerCase().includes(keyword.toLowerCase())) {
+      // Fallback for keywords without embeddings
+      maxSimilarity = Math.max(maxSimilarity, 0.7);
+    }
+  }
+  
+  return maxSimilarity;
+}
+
+// Get embedding for a text passage
+function getTextEmbedding(text) {
+  const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+  if (words.length === 0) return null;
+  
+  // Use dimensionality from our loaded embeddings
+  const dimensions = 50; // GloVe 50d
+  const result = new Array(dimensions).fill(0);
+  
+  let wordCount = 0;
+  for (const word of words) {
+    if (wordEmbeddings[word]) {
+      for (let i = 0; i < dimensions; i++) {
+        result[i] += wordEmbeddings[word][i];
+      }
+      wordCount++;
+    }
+  }
+  
+  // If we found any known words, normalize the vector
+  if (wordCount > 0) {
+    for (let i = 0; i < dimensions; i++) {
+      result[i] /= wordCount;
+    }
+    return result;
+  }
+  
+  return null;
+}
+
+// Get embedding for a keyword
+function getKeywordEmbedding(keyword) {
+  const words = keyword.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+  if (words.length === 0) return null;
+  
+  // For single words, directly use the embedding if available
+  if (words.length === 1 && wordEmbeddings[words[0]]) {
+    return wordEmbeddings[words[0]];
+  }
+  
+  // For multi-word keywords, average the embeddings
+  const dimensions = 50; // GloVe 50d
+  const result = new Array(dimensions).fill(0);
+  
+  let wordCount = 0;
+  for (const word of words) {
+    if (wordEmbeddings[word]) {
+      for (let i = 0; i < dimensions; i++) {
+        result[i] += wordEmbeddings[word][i];
+      }
+      wordCount++;
+    }
+  }
+  
+  // If we found any known words, normalize the vector
+  if (wordCount > 0) {
+    for (let i = 0; i < dimensions; i++) {
+      result[i] /= wordCount;
+    }
+    return result;
+  }
+  
+  return null;
+}
+
+// Calculate cosine similarity between two vectors
+function cosineSimilarity(vecA, vecB) {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
 
 // Function to add overlay to elements containing blocked terms
 function addOverlayToElements() {
@@ -34,29 +161,30 @@ function addOverlayToElements() {
       continue;
     }
     
-    const text = node.textContent.toLowerCase();
-    for (const keyword of keywordsToBlock) {
-      if (text.includes(keyword.toLowerCase())) {
-        // Find the closest block-level parent to overlay
-        let parent = node.parentElement;
-        
-        // Look for a meaningful container
-        while (parent && 
-              (window.getComputedStyle(parent).display === 'inline' || 
-               parent.textContent.trim().length < 50)) {
-          // Don't go higher than these elements
-          if (parent.tagName === 'ARTICLE' || 
-              parent.tagName === 'SECTION' || 
-              parent.tagName === 'DIV' && parent.offsetHeight > 50) {
-            break;
-          }
-          parent = parent.parentElement;
+    const text = node.textContent;
+    // Use the embedding-based relevance score instead of simple includes
+    const relevanceScore = getRelevanceScore(text, keywordsToBlock);
+    
+    // Only filter content above a certain relevance threshold
+    if (relevanceScore > 0.6) { // Adjust threshold as needed
+      // Find the closest block-level parent to overlay
+      let parent = node.parentElement;
+      
+      // Look for a meaningful container
+      while (parent && 
+            (window.getComputedStyle(parent).display === 'inline' || 
+             parent.textContent.trim().length < 50)) {
+        // Don't go higher than these elements
+        if (parent.tagName === 'ARTICLE' || 
+            parent.tagName === 'SECTION' || 
+            parent.tagName === 'DIV' && parent.offsetHeight > 50) {
+          break;
         }
-        
-        if (parent) {
-          matches.add(parent);
-        }
-        break;
+        parent = parent.parentElement;
+      }
+      
+      if (parent) {
+        matches.add(parent);
       }
     }
   }
@@ -81,15 +209,13 @@ function handleYouTubeFiltering() {
     }
     
     if (titleElement) {
-      const titleText = titleElement.textContent.toLowerCase();
+      const titleText = titleElement.textContent;
       
-      // Check if title contains any blocked keywords
-      for (const keyword of keywordsToBlock) {
-        if (titleText.includes(keyword.toLowerCase())) {
-          // Add the entire video element to matches
-          matches.add(videoElement);
-          break;
-        }
+      // Use relevance score instead of direct keyword match
+      const relevanceScore = getRelevanceScore(titleText, keywordsToBlock);
+      if (relevanceScore > 0.6) { // Same threshold as regular content
+        // Add the entire video element to matches
+        matches.add(videoElement);
       }
     }
   });
@@ -97,16 +223,14 @@ function handleYouTubeFiltering() {
   // For YouTube watch page - video title
   const watchPageTitle = document.querySelector('.title.ytd-video-primary-info-renderer');
   if (watchPageTitle) {
-    const titleText = watchPageTitle.textContent.toLowerCase();
+    const titleText = watchPageTitle.textContent;
     
-    for (const keyword of keywordsToBlock) {
-      if (titleText.includes(keyword.toLowerCase())) {
-        // Find the player container
-        const playerContainer = document.querySelector('.html5-video-player');
-        if (playerContainer) {
-          matches.add(playerContainer);
-        }
-        break;
+    const relevanceScore = getRelevanceScore(titleText, keywordsToBlock);
+    if (relevanceScore > 0.8) {
+      // Find the player container
+      const playerContainer = document.querySelector('.html5-video-player');
+      if (playerContainer) {
+        matches.add(playerContainer);
       }
     }
   }
@@ -116,13 +240,11 @@ function handleYouTubeFiltering() {
   recommendedVideos.forEach(video => {
     const titleElement = video.querySelector('#video-title');
     if (titleElement) {
-      const titleText = titleElement.textContent.toLowerCase();
+      const titleText = titleElement.textContent;
       
-      for (const keyword of keywordsToBlock) {
-        if (titleText.includes(keyword.toLowerCase())) {
-          matches.add(video);
-          break;
-        }
+      const relevanceScore = getRelevanceScore(titleText, keywordsToBlock);
+      if (relevanceScore > 0.6) {
+        matches.add(video);
       }
     }
   });
