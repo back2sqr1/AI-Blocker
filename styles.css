@@ -270,19 +270,7 @@
     justify-content: space-between;
     align-items: center;
   }
-  
-  .timer {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--primary);
-    font-weight: 500;
-  }
-  
-  .timer-icon {
-    width: 16px;
-    height: 16px;
-  }
+
   
   .actions {
     display: flex;

@@ -28,144 +28,87 @@ document.getElementById('settingsTab').addEventListener('click', () => {
 
 // Initialize when popup is loaded
 document.addEventListener('DOMContentLoaded', function() {
-  const focusToggle = document.getElementById('focusToggle');
-  
-  // Get current state from background script
-  chrome.runtime.sendMessage({ action: 'getState' }, (response) => {
-    if (!response || chrome.runtime.lastError) {
-      console.warn("Error getting state:", chrome.runtime.lastError);
-      return;
+// Get settings from background script
+chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+const settings = response.settings;
+
+// Update UI based on settings
+document.getElementById('focusToggle').checked = settings.isEnabled;
+
+// Update category toggles
+document.querySelectorAll('.block-item input[type="checkbox"]').forEach((checkbox, index) => {
+    const categories = ['news', 'videoGames', 'socialMedia', 'shopping'];
+    if (index < categories.length) {
+    checkbox.checked = settings.categories[categories[index]];
     }
-    
-    // Update toggle switch
-    focusToggle.checked = response.isEnabled;
-  });
-  
-  // Toggle blocking on/off
-  focusToggle.addEventListener('change', function() {
-    const isEnabled = this.checked;
+});
+
+});
+
+// Toggle focus mode on/off
+document.getElementById('focusToggle').addEventListener('change', function() {
+chrome.runtime.sendMessage({ 
+    action: 'getSettings' 
+}, (response) => {
+    const settings = response.settings;
+    settings.isEnabled = this.checked;
     
     chrome.runtime.sendMessage({ 
-      action: 'toggleBlocking', 
-      isEnabled: isEnabled 
+    action: 'updateSettings', 
+    settings: settings 
     });
-  });
-  
-  // Timer functionality (keep if needed)
-  let timerInterval;
-  let seconds = 25 * 60; // 25 minutes in seconds
-
-  document.querySelector('.primary-button').addEventListener('click', function() {
-    // Start button clicked
-    if (this.textContent === 'Start') {
-      this.textContent = 'Pause';
-      
-      timerInterval = setInterval(function() {
-        seconds--;
-        
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        
-        document.querySelector('.timer span').textContent = 
-          `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds} Remaining`;
-          
-        if (seconds <= 0) {
-          clearInterval(timerInterval);
-          document.querySelector('.primary-button').textContent = 'Start';
-          alert('Focus session completed!');
-        }
-      }, 1000);
-    } else {
-      // Pause button clicked
-      this.textContent = 'Start';
-      clearInterval(timerInterval);
-    }
-  });
-
-  // Reset button
-  document.querySelector('.secondary-button').addEventListener('click', function() {
-    clearInterval(timerInterval);
-    seconds = 25 * 60;
-    document.querySelector('.timer span').textContent = '25:00 Remaining';
-    document.querySelector('.primary-button').textContent = 'Start';
-  });
+});
 });
 
-
-// Add this to your DOMContentLoaded event handler
-
-// Content filtering UI
-const contentFilterToggle = document.getElementById('contentFilterToggle');
-const keywordsSection = document.getElementById('keywordsSection');
-const keywordsList = document.getElementById('keywordsList');
-const newKeywordInput = document.getElementById('newKeyword');
-const addKeywordBtn = document.getElementById('addKeywordBtn');
-
-// Load content filter settings
-chrome.runtime.sendMessage({action: 'getContentFilters'}, (response) => {
-  if (!response || chrome.runtime.lastError) return;
-  
-  contentFilterToggle.checked = response.isEnabled;
-  keywordsSection.style.display = response.isEnabled ? 'block' : 'none';
-  
-  // Display current keywords
-  updateKeywordsList(response.keywords);
-});
-
-// Toggle content filtering
-contentFilterToggle.addEventListener('change', function() {
-  const isEnabled = this.checked;
-  keywordsSection.style.display = isEnabled ? 'block' : 'none';
-  
-  // Get current keywords
-  chrome.runtime.sendMessage({action: 'getContentFilters'}, (response) => {
-    if (!response || chrome.runtime.lastError) return;
+// Toggle categories
+document.querySelectorAll('.block-item input[type="checkbox"]').forEach((checkbox, index) => {
+checkbox.addEventListener('change', function() {
+    chrome.runtime.sendMessage({ 
+    action: 'getSettings' 
+    }, (response) => {
+    const settings = response.settings;
+    const categories = ['news', 'videoGames', 'socialMedia', 'shopping'];
     
-    // Update settings
-    chrome.runtime.sendMessage({
-      action: 'updateContentFilters',
-      isEnabled: isEnabled,
-      keywords: response.keywords
+    if (index < categories.length) {
+        settings.categories[categories[index]] = this.checked;
+        
+        chrome.runtime.sendMessage({ 
+        action: 'updateSettings', 
+        settings: settings 
+        });
+    }
     });
-  });
+});
+});
 });
 
-// Add new keyword
-addKeywordBtn.addEventListener('click', function() {
-  const keyword = newKeywordInput.value.trim();
-  if (!keyword) return;
-  
-  chrome.runtime.sendMessage({action: 'getContentFilters'}, (response) => {
-    if (!response || chrome.runtime.lastError) return;
-    
-    const keywords = [...response.keywords];
-    if (!keywords.includes(keyword)) {
-      keywords.push(keyword);
-      
-      chrome.runtime.sendMessage({
-        action: 'updateContentFilters',
-        isEnabled: response.isEnabled,
-        keywords: keywords
-      }, () => {
-        newKeywordInput.value = '';
-        updateKeywordsList(keywords);
-      });
-    }
-  });
-});
 
-// Display keywords with remove option
-function updateKeywordsList(keywords) {
-  keywordsList.innerHTML = '';
-  
-  keywords.forEach(keyword => {
-    const keywordItem = document.createElement('div');
-    keywordItem.className = 'keyword-item';
-    keywordItem.style = 'display: flex; justify-content: space-between; margin-bottom: 5px; padding: 5px; background-color: #f3f4f6; border-radius: 4px;';
+// Add custom block functionality
+document.querySelector('.add-block').addEventListener('click', function() {
+    const siteName = prompt('Enter website name:');
+    if (!siteName) return;
     
-    keywordItem.innerHTML = `
-      <span>${keyword}</span>
-      <button class="remove-keyword" data-keyword="${keyword}" style="border: none; background: none; color: #ef4444; cursor: pointer;">✕</button>
+    const description = prompt('Enter description:');
+    
+    // Create new block item
+    const newBlockItem = document.createElement('div');
+    newBlockItem.className = 'block-item';
+    newBlockItem.innerHTML = `
+      <div class="block-item-left">
+        <svg class="category-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+        <div>
+          <div class="category-text">${siteName}</div>
+          <div class="category-description">${description || 'Custom website'}</div>
+        </div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" checked>
+        <span class="slider"></span>
+      </label>
     `;
     
     keywordsList.appendChild(keywordItem);
