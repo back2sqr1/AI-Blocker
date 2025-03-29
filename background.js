@@ -3,11 +3,33 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log("FocusMode extension installed");
   
   // Set default state - blocking disabled
-  chrome.storage.sync.set({ isEnabled: false });
+  chrome.storage.sync.set({ 
+    isEnabled: false,
+    contentFilterSettings: {
+      isEnabled: false,
+      keywords: ['politics', 'election', 'controversy'] // Default keywords
+    }
+  });
 });
 
-// Listen for messages from popup
+// Default content filtering settings
+let contentFilterSettings = {
+  isEnabled: false,
+  keywords: ['politics', 'election', 'controversy'] // Default keywords
+};
+
+// Load settings from storage
+function loadContentFilterSettings() {
+  chrome.storage.sync.get(['contentFilterSettings'], (data) => {
+    if (data.contentFilterSettings) {
+      contentFilterSettings = data.contentFilterSettings;
+    }
+  });
+}
+
+// SINGLE combined listener for all messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Website blocking messages
   if (message.action === "toggleBlocking") {
     const isEnabled = message.isEnabled;
     console.log("Toggling blocking:", isEnabled);
@@ -18,6 +40,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Update blocking rules
     updateBlockRules(isEnabled);
     
+    // Also update content filtering to match main toggle if you want them synchronized
+    contentFilterSettings.isEnabled = isEnabled;
+    chrome.storage.sync.set({ contentFilterSettings: contentFilterSettings });
+    
+    // Notify tabs about content filter change
+    notifyTabsContentFilterChanged();
+    
     sendResponse({ success: true });
   }
   else if (message.action === "getState") {
@@ -26,6 +55,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true; // Will respond asynchronously
   }
+  // Content filtering messages
+  else if (message.action === 'getContentFilters') {
+    sendResponse({
+      isEnabled: contentFilterSettings.isEnabled,
+      keywords: contentFilterSettings.keywords
+    });
+  }
+  else if (message.action === 'updateContentFilters') {
+    contentFilterSettings = {
+      isEnabled: message.isEnabled,
+      keywords: message.keywords
+    };
+    
+    chrome.storage.sync.set({ contentFilterSettings: contentFilterSettings });
+    
+    // Notify tabs about content filter change
+    notifyTabsContentFilterChanged();
+    
+    sendResponse({ success: true });
+  }
+  
+  // Return true for async response
+  return true;
 });
 
 // Function to enable/disable blocking rules
@@ -56,72 +108,26 @@ function updateBlockRules(isEnabled) {
   }
 }
 
+// Function to notify all tabs about filter changes
+function notifyTabsContentFilterChanged() {
+  chrome.tabs.query({}, (tabs) => {
+    for (let tab of tabs) {
+      chrome.tabs.sendMessage(tab.id, {
+        action: 'updateFilters',
+        isEnabled: contentFilterSettings.isEnabled,
+        keywords: contentFilterSettings.keywords
+      }).catch(() => {
+        // Ignore errors for tabs where content script isn't loaded
+      });
+    }
+  });
+}
+
 // When browser restarts, check saved state and apply rules
 chrome.runtime.onStartup.addListener(() => {
   chrome.storage.sync.get(['isEnabled'], (data) => {
     updateBlockRules(data.isEnabled || false);
   });
-});
-
-
-// Add this to your existing background.js
-
-// Default content filtering settings
-let contentFilterSettings = {
-  isEnabled: false,
-  keywords: ['politics', 'election', 'controversy'] // Default keywords
-};
-
-// Initialize settings
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.set({ contentFilterSettings: contentFilterSettings });
-});
-
-// Load settings from storage
-function loadContentFilterSettings() {
-  chrome.storage.sync.get(['contentFilterSettings'], (data) => {
-    if (data.contentFilterSettings) {
-      contentFilterSettings = data.contentFilterSettings;
-    }
-  });
-}
-
-// Listen for content script requests
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Handle existing messages...
-  
-  if (message.action === 'getContentFilters') {
-    sendResponse({
-      isEnabled: contentFilterSettings.isEnabled,
-      keywords: contentFilterSettings.keywords
-    });
-  }
-  else if (message.action === 'updateContentFilters') {
-    contentFilterSettings = {
-      isEnabled: message.isEnabled,
-      keywords: message.keywords
-    };
-    
-    chrome.storage.sync.set({ contentFilterSettings: contentFilterSettings });
-    
-    // Send update to all tabs
-    chrome.tabs.query({}, (tabs) => {
-      for (let tab of tabs) {
-        chrome.tabs.sendMessage(tab.id, {
-          action: 'updateFilters',
-          isEnabled: contentFilterSettings.isEnabled,
-          keywords: contentFilterSettings.keywords
-        }).catch(() => {
-          // Ignore errors for tabs where content script isn't loaded
-        });
-      }
-    });
-    
-    sendResponse({ success: true });
-  }
-  
-  // Return true for async response
-  return true;
 });
 
 // Load settings on startup
