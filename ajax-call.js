@@ -83,3 +83,75 @@ checkbox.addEventListener('change', function() {
 });
 });
 });
+
+// Timer functionality
+let timerInterval;
+let seconds = 25 * 60; // 25 minutes in seconds
+
+document.querySelector('.primary-button').addEventListener('click', function() {
+  // Start button clicked
+  if (this.textContent === 'Start') {
+    this.textContent = 'Pause';
+    
+    timerInterval = setInterval(function() {
+      seconds--;
+      
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      
+      document.querySelector('.timer span').textContent = 
+        `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds} Remaining`;
+        
+      if (seconds <= 0) {
+        clearInterval(timerInterval);
+        document.querySelector('.primary-button').textContent = 'Start';
+        alert('Focus session completed!');
+      }
+    }, 1000);
+  } else {
+    // Pause button clicked
+    this.textContent = 'Start';
+    clearInterval(timerInterval);
+  }
+});
+
+// Reset button
+document.querySelector('.secondary-button').addEventListener('click', function() {
+  clearInterval(timerInterval);
+  seconds = 25 * 60;
+  document.querySelector('.timer span').textContent = '25:00 Remaining';
+  document.querySelector('.primary-button').textContent = 'Start';
+});
+
+
+// Add custom block functionality
+document.querySelector('.add-block').addEventListener('click', function() {
+    const siteName = prompt('Enter website name:');
+    if (!siteName) return;
+    
+    const description = prompt('Enter description:');
+    
+    // Create new block item
+    const newBlockItem = document.createElement('div');
+    newBlockItem.className = 'block-item';
+    newBlockItem.innerHTML = `
+      <div class="block-item-left">
+        <svg class="category-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+        <div>
+          <div class="category-text">${siteName}</div>
+          <div class="category-description">${description || 'Custom website'}</div>
+        </div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" checked>
+        <span class="slider"></span>
+      </label>
+    `;
+    
+    // Insert before the "Add Custom Block" button
+    document.querySelector('.block-list').insertBefore(newBlockItem, this);
+  });

@@ -1,174 +1,113 @@
-// List of blocked domains by category
-const blockedSites = {
-    news: ["cnn.com", "nytimes.com", "bbc.com", "reuters.com", "bloomberg.com"],
-    videoGames: ["twitch.tv", "steam.community", "epicgames.com", "xbox.com", "playstation.com"],
-    socialMedia: ["facebook.com", "twitter.com", "instagram.com", "reddit.com", "tiktok.com"],
-    shopping: ["amazon.com", "ebay.com", "etsy.com", "walmart.com", "target.com"]
-  };
+// Listen for extension installation
+chrome.runtime.onInstalled.addListener(function() {
+  console.log("FocusMode extension installed");
   
-  // Default settings
-  let settings = {
-    isEnabled: false,
-    categories: {
-      news: true,
-      videoGames: true,
-      socialMedia: true,
-      shopping: false
-    },
-    customBlocks: [],
-    focusTimer: {
-      isActive: false,
-      duration: 25 * 60, // 25 minutes in seconds
-      remaining: 0,
-      endTime: null
-    },
-    stats: {
-      sitesBlockedToday: 0,
-      focusTimeToday: 0
-    }
-  };
+  // Set default settings
+  chrome.storage.sync.set({
+    focusModeEnabled: false,
+    blockedSites: [
+      "facebook.com",
+      "twitter.com",
+      "instagram.com",
+      "youtube.com"
+    ]
+  }, function() {
+    console.log("Default settings saved successfully");
+    // Log what was saved
+    chrome.storage.sync.get(null, function(data) {
+      console.log("Current storage state:", data);
+    });
+  });
+});
+
+// Listen for tab updates
+chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
+  console.log("Tab updated - ID:", tabId, "Status:", changeInfo.status);
   
-  // Load settings on startup
-  chrome.storage.local.get('focusModeSettings', (data) => {
-    if (data.focusModeSettings) {
-      settings = data.focusModeSettings;
+  // Check if URL is blocked when a tab finishes loading
+  if (changeInfo.status === 'complete' && tab.url) {
+    console.log("Tab fully loaded:", tab.url);
+    
+    chrome.storage.sync.get(['focusModeEnabled', 'blockedSites'], function(data) {
+      console.log("Focus mode enabled:", data.focusModeEnabled);
+      console.log("Blocked sites list:", data.blockedSites);
       
-      // Check if there's an active timer and restore it
-      if (settings.focusTimer.isActive && settings.focusTimer.endTime) {
-        const now = new Date().getTime();
-        const endTime = settings.focusTimer.endTime;
+      // If focus mode is on, check if we should block this site
+      if (data.focusModeEnabled) {
+        const currentUrl = new URL(tab.url).hostname;
+        console.log("Checking URL:", currentUrl);
         
-        if (now < endTime) {
-          settings.focusTimer.remaining = Math.floor((endTime - now) / 1000);
-          startTimer();
+        // Check if current site is in blocked list
+        const isBlocked = data.blockedSites.some(site => {
+          const matches = currentUrl.includes(site);
+          console.log(`Checking against ${site}: ${matches ? "BLOCKED" : "allowed"}`);
+          return matches;
+        });
+        
+        if (isBlocked) {
+          console.log("BLOCKING ACCESS to:", currentUrl);
+          // Redirect to a block page
+          chrome.tabs.update(tabId, { url: "blocked.html" });
         } else {
-          // Timer expired while extension was inactive
-          settings.focusTimer.isActive = false;
-          settings.focusTimer.remaining = 0;
-          settings.focusTimer.endTime = null;
-          saveSettings();
+          console.log("Site allowed:", currentUrl);
         }
+      } else {
+        console.log("Focus mode is OFF - not checking for blocked sites");
       }
-    }
-    saveSettings();
-  });
-  
-  // Listen for navigation events to block websites
-  chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-    // Only check main frame (not iframes, etc)
-    if (details.frameId !== 0 || !settings.isEnabled) return;
-    
-    const url = new URL(details.url);
-    const domain = url.hostname.replace('www.', '');
-    
-    // Check if the domain should be blocked
-    if (shouldBlockDomain(domain)) {
-      // Increment blocked count
-      settings.stats.sitesBlockedToday++;
-      saveSettings();
-      
-      // Redirect to blocked page
-      chrome.tabs.update(details.tabId, {
-        url: chrome.runtime.getURL("blocked.html") + 
-             "?site=" + encodeURIComponent(domain) + 
-             "&from=" + encodeURIComponent(details.url)
-      });
-    }
-  });
-  
-  // Check if a domain should be blocked
-  function shouldBlockDomain(domain) {
-    // Check custom blocks
-    if (settings.customBlocks.some(custom => domain.includes(custom))) {
-      return true;
-    }
-    
-    // Check category blocks
-    for (const [category, isEnabled] of Object.entries(settings.categories)) {
-      if (isEnabled && blockedSites[category].some(site => domain.includes(site))) {
-        return true;
-      }
-    }
-    
-    return false;
+    });
   }
+});
+
+// Listen for messages from popup.js
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+  console.log("Message received:", request);
+  console.log("Sender:", sender);
   
-  // Timer functionality
-  function startTimer() {
-    if (settings.focusTimer.isActive) {
-      const intervalId = setInterval(() => {
-        if (settings.focusTimer.remaining <= 0) {
-          // Timer finished
-          clearInterval(intervalId);
-          settings.focusTimer.isActive = false;
-          settings.focusTimer.endTime = null;
-          settings.stats.focusTimeToday += settings.focusTimer.duration / 60; // Convert to minutes
-          saveSettings();
-          
-          // Notify user
-          chrome.notifications.create({
-            type: 'basic',
-            iconUrl: 'icons/icon128.png',
-            title: 'Focus Session Complete',
-            message: 'Great job! You completed a focus session.'
-          });
-        } else {
-          settings.focusTimer.remaining--;
-          saveSettings();
-        }
-      }, 1000);
-    }
-  }
-  
-  // Listen for messages from popup
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    switch (message.action) {
-      case 'getSettings':
-        sendResponse({ settings: settings });
-        break;
-      case 'updateSettings':
-        settings = message.settings;
-        saveSettings();
-        sendResponse({ success: true });
-        break;
-      case 'startTimer':
-        settings.focusTimer.isActive = true;
-        settings.focusTimer.remaining = message.duration || settings.focusTimer.duration;
-        settings.focusTimer.endTime = new Date().getTime() + (settings.focusTimer.remaining * 1000);
-        saveSettings();
-        startTimer();
-        sendResponse({ success: true });
-        break;
-      case 'stopTimer':
-        settings.focusTimer.isActive = false;
-        settings.focusTimer.endTime = null;
-        saveSettings();
-        sendResponse({ success: true });
-        break;
-    }
+  if (request.action === "toggleFocusMode") {
+    console.log("Toggling focus mode to:", request.enabled);
+    
+    chrome.storage.sync.set({ focusModeEnabled: request.enabled }, function() {
+      console.log("Focus mode setting updated successfully");
+      sendResponse({ success: true });
+    });
+    
+    // Return true to indicate you wish to send a response asynchronously
     return true;
-  });
-  
-  // Save settings to chrome storage
-  function saveSettings() {
-    chrome.storage.local.set({ 'focusModeSettings': settings });
   }
-  chrome.webRequest.onBeforeRequest.addListener(
+});
+
+// Ad blocking functionality
+chrome.webRequest.onBeforeRequest.addListener(
     function(details) {
-        return {cancel: true}
+        console.log("Blocked ad request:", details.url);
+        return {cancel: true};
     },
     {urls: [
         "*://*.zedo.com/*",
         "*://*.doubleclick.net/*",
-        "://partner.googleadservices.com/*",
-        "://*.googlesyndication.com/*",
+        "*://partner.googleadservices.com/*",
+        "*://*.googlesyndication.com/*",
         "*://*.google-analytics.com/*",
         "*://creative.ak.fbcdn.net/*",
-        "*://*adbrite.com/*",
-        "*//*.exponential.com/*",
+        "*://*.adbrite.com/*",
+        "*://*.exponential.com/*",
         "*://*.quantserve.com/*",
         "*://*.scorecardresearch.com/*",
     ]},
     ["blocking"]
-)
+);
 
+// Log when the extension starts
+console.log("Background script initialized - " + new Date().toLocaleString());
+
+// Add a helper function to dump current state for debugging
+function dumpState() {
+  console.log("=== EXTENSION STATE DUMP ===");
+  chrome.storage.sync.get(null, function(data) {
+    console.log("Storage data:", data);
+  });
+  console.log("========================");
+}
+
+// Run state dump on initialization
+dumpState();
