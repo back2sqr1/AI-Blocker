@@ -63,23 +63,30 @@ function addOverlayToElements() {
       return;
     }
     
-    // Mark as filtered
+
     element.classList.add('content-filtered');
     element.style.position = 'relative';
-    
+
     // Create overlay
     const overlay = document.createElement('div');
     overlay.className = 'content-blocker-overlay';
-    overlay.innerHTML = '<p>Content filtered</p><button class="show-content-btn">Show anyway</button>';
-    
+
+    // Create close icon (×) in top right
+    const closeIcon = document.createElement('span');
+    closeIcon.className = 'content-close-icon';
+    closeIcon.innerHTML = '&times;';
+
+    // Add close icon to overlay
+    overlay.appendChild(closeIcon);
+
     // Add overlay to the element
     element.appendChild(overlay);
-    
-    // Add show button functionality
-    overlay.querySelector('.show-content-btn').addEventListener('click', function(e) {
-      e.stopPropagation();
-      overlay.style.display = 'none';
-      element.classList.remove('content-filtered');
+
+    // Add functionality to close icon
+    closeIcon.addEventListener('click', function(e) {
+    e.stopPropagation();
+    overlay.style.display = 'none';
+    element.classList.remove('content-filtered');
     });
   });
 }
